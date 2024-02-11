@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthChain Frontend</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.3/dist/web3.min.js"></script>
+    <style>
+        body {
+        font-family: sans-serif;
+        color: #333;
+        background-color: #f2f2f2;
+        padding: 20px;
+        margin: 0 auto;
+        max-width: 60%;
+        }
+
+        h1, h2 {
+        text-align: center;
+        margin-bottom: 20px;
+        }
+
+        h1 {
+        font-size: 2em;
+        font-weight: bold;
+        }
+
+        h2 {
+        font-size: 1.5em;
+        }
+
+        /* Forms */
+        form {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 20px;
+        }
+
+        label {
+        margin-bottom: 5px;
+        font-weight: bold;
+        }
+
+        input[type="text"], input[type="number"] {
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        }
+
+        button {
+        background-color: #4CAF50; /* Green */
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        }
+
+        button:hover {
+        background-color: #3e8e41; /* Darker green */
+        }
+
+        /* Records Section */
+        #records {
+        margin-top: 20px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 10px;
+        }
+
+        table {
+        border-collapse: collapse;
+        width: 100%;
+        }
+
+        th, td {
+        padding: 5px;
+        text-align: left;
+        border: 1px solid #ccc;
+        }
+
+        th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+        }
+
+        /* Responsiveness */
+        @media only screen and (max-width: 768px) {
+        h1 {
+            font-size: 1.5em;
+        }
+
+        h2 {
+            font-size: 1em;
+        }
+
+        form {
+            flex-direction: column;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+        }
+
+        #records table {
+            font-size: 0.8em;
+        }
+        }
+    </style>
+    
+</head>
+<body>
+    <h1>HealthChain Frontend</h1>
+
+    <h2>Add Record</h2>
+    <form id="addRecordForm">
+        <label for="patientName">Patient Name:</label>
+        <input type="text" id="patientName" name="patientName" required>
+        <label for="condition">Condition:</label>
+        <input type="text" id="condition" name="condition" required>
+        <button type="submit">Add Record</button>
+    </form>
+
+    <h2>Update Condition</h2>
+    <form id="updateConditionForm">
+        <label for="recordId">Record ID:</label>
+        <input type="number" id="recordId" name="recordId" required>
+        <label for="newCondition">New Condition:</label>
+        <input type="text" id="newCondition" name="newCondition" required>
+        <button type="submit">Update Condition</button>
+    </form>
+
+    <h2>Grant Access</h2>
+    <form id="grantAccessForm">
+        <label for="recordIdAccess">Record ID:</label>
+        <input type="number" id="recordIdAccess" name="recordIdAccess" required>
+        <label for="requesterAddress">Requester Address:</label>
+        <input type="text" id="requesterAddress" name="requesterAddress" required>
+        <button type="submit">Grant Access</button>
+    </form>
+
+    <h2>Get Record</h2>
+    <form id="getRecordForm">
+        <label for="recordIdGet">Record ID:</label>
+        <input type="number" id="recordIdGet" name="recordIdGet" required>
+        <button type="submit">Get Record</button>
+    </form>
+
+    <h2>Records</h2>
+    <div id="records"></div>
+
+    <script>
+        var web3 = new Web3(window.ethereum);
+
+        // Check if Web3 is connected to a provider (e.g., MetaMask)
+        if (typeof web3 !== 'undefined') {
+            console.log('Web3 is connected');
+        } else {
+            console.log('Web3 is not connected');
+        }
+
+        // Load the contract ABI
+        var contractABI = [
+            {
+                "inputs": [
+                    {
+                        "internalType": "string",
+                        "name": "_patientName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "_condition",
+                        "type": "string"
+                    }
+                ],
+                "name": "addRecord",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": true,
+                        "internalType": "uint256",
+                        "name": "id",
+                        "type": "uint256"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "string",
+                        "name": "newCondition",
+                        "type": "string"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "timestamp",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "ConditionUpdated",
+                "type": "event"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "_id",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "_requester",
+                        "type": "address"
+                    }
+                ],
+                "name": "grantAccess",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": true,
+                        "internalType": "uint256",
+                        "name": "id",
+                        "type": "uint256"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "address",
+                        "name": "requester",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "timestamp",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "RecordAccessed",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": true,
+                        "internalType": "uint256",
+                        "name": "id",
+                        "type": "uint256"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "string",
+                        "name": "patientName",
+                        "type": "string"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "string",
+                        "name": "condition",
+                        "type": "string"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "timestamp",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "RecordAdded",
+                "type": "event"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "_id",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "_newCondition",
+                        "type": "string"
+                    }
+                ],
+                "name": "updateCondition",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "stateMutability": "payable",
+                "type": "receive"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "_id",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "getRecord",
+                "outputs": [
+                    {
+                        "components": [
+                            {
+                                "internalType": "uint256",
+                                "name": "id",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "patientName",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "condition",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "timestamp",
+                                "type": "uint256"
+                            }
+                        ],
+                        "internalType": "struct HealthChain.HealthRecord",
+                        "name": "",
+                        "type": "tuple"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "_id",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "_requester",
+                        "type": "address"
+                    }
+                ],
+                "name": "hasAccess",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ];
+
+        // Contract address
+        var contractAddress = ''; // Replace with your contract address
+
+        // Instantiate the contract
+        var healthChainContract = new web3.eth.Contract(contractABI, contractAddress);
+
+        // Event listener for Add Record form submission
+        document.getElementById("addRecordForm").addEventListener("submit", function(event) {
+            event.preventDefault();
+            var patientName = document.getElementById("patientName").value;
+            var condition = document.getElementById("condition").value;
+            healthChainContract.methods.addRecord(patientName, condition).send({ from: '', gas: 3000000 })
+                .on('transactionHash', function(hash){
+                    console.log('Transaction Hash:', hash);
+                })
+                .on('receipt', function(receipt){
+                    console.log('Transaction Receipt:', receipt);
+                    // Display success message
+                    alert('Record added successfully!');
+                });
+        });
+
+        // Event listener for Update Condition form submission
+        document.getElementById("updateConditionForm").addEventListener("submit", function(event) {
+            event.preventDefault();
+            var recordId = document.getElementById("recordId").value;
+            var newCondition = document.getElementById("newCondition").value;
+            healthChainContract.methods.updateCondition(recordId, newCondition).send({ from: '', gas: 3000000 })
+                .on('transactionHash', function(hash){
+                    console.log('Transaction Hash:', hash);
+                })
+                .on('receipt', function(receipt){
+                    console.log('Transaction Receipt:', receipt);
+                    // Display success message
+                    alert('Condition updated successfully!');
+                });
+        });
+
+        // Event listener for Grant Access form submission
+        document.getElementById("grantAccessForm").addEventListener("submit", function(event) {
+            event.preventDefault();
+            var recordId = document.getElementById("recordIdAccess").value;
+            var requesterAddress = document.getElementById("requesterAddress").value;
+            healthChainContract.methods.grantAccess(recordId, requesterAddress).send({ from: '', gas: 3000000 })
+                .on('transactionHash', function(hash){
+                    console.log('Transaction Hash:', hash);
+                })
+                .on('receipt', function(receipt){
+                    console.log('Transaction Receipt:', receipt);
+                    // Display success message
+                    alert('Access granted successfully!');
+                });
+        });
+
+        // Event listener for Get Record form submission
+        document.getElementById("getRecordForm").addEventListener("submit", function(event) {
+            event.preventDefault();
+            var recordId = document.getElementById("recordIdGet").value;
+            healthChainContract.methods.getRecord(recordId).call({from: ''})
+                .then(function(result){
+                    console.log('Retrieved Record:', result);
+                    // Display retrieved record data in the HTML page
+                    var recordsDiv = document.getElementById("records");
+                    recordsDiv.innerHTML = "ID: " + result.id + "<br> Patient Name: " + result.patientName + "<br> Condition: " + result.condition + "<br> Timestamp: " + result.timestamp;
+                })
+                .catch(function(error){
+                    console.error('Error:', error);
+                    // Display error message
+                    alert('Error retrieving record!');
+                });
+        });
+    </script>
+</body>
+</html>
